@@ -1,0 +1,128 @@
+﻿《编译原理》实验二  语法分析运行结果
+示例：悬空 else 文法（冲突示例）
+
+################ 文法 ################
+Vn = { S, E }
+Vt = { a, b, else, if, then }
+S  = S
+P  = { S→ifEthenSelseS ； S→ifEthenS ； S→a ； E→b }
+待识别字符串：if b then if b then a else a
+
+################ 一、分析表 ################
+
+-------------------- 1. LL(1) 分析表 --------------------
+非终结符  a    b    else      if            then  #
+------------------------------------------------------
+S         S→a                 S→ifEthenSS′
+S′                  S′→elseS                      S′→ε
+E              E→b
+
+-------------------- 2. LR(0) 分析表 --------------------
+状态  a   b   else  if  then  #    S  E
+---------------------------------------
+0     s1            s2             3
+1     r3  r3  r3    r3  r3    r3
+2         s4                          5
+3                             acc
+4     r4  r4  r4    r4  r4    r4
+5                       s6
+6     s1            s2             7
+7     r2  r2  s8    r2  r2    r2
+8     s1            s2             9
+9     r1  r1  r1    r1  r1    r1
+
+-------------------- 3. SLR(1) 分析表 --------------------
+状态  a   b   else  if  then  #    S  E
+---------------------------------------
+0     s1            s2             3
+1             r3              r3
+2         s4                          5
+3                             acc
+4                       r4
+5                       s6
+6     s1            s2             7
+7             s8              r2
+8     s1            s2             9
+9             r1              r1
+
+################ 二、分析过程表 ################
+
+-------------------- 1. LL(1) 分析过程表 --------------------
+步骤  分析栈         当前输入a  剩余输入串             所用产生式
+-------------------------------------------------------------------
+1     #S             if         ifbthenifbthenaelsea#  S→ifEthenSS′
+2     #S′SthenEif    if         ifbthenifbthenaelsea#
+3     #S′SthenE      b          bthenifbthenaelsea#    E→b
+4     #S′Sthenb      b          bthenifbthenaelsea#
+5     #S′Sthen       then       thenifbthenaelsea#
+6     #S′S           if         ifbthenaelsea#         S→ifEthenSS′
+7     #S′S′SthenEif  if         ifbthenaelsea#
+8     #S′S′SthenE    b          bthenaelsea#           E→b
+9     #S′S′Sthenb    b          bthenaelsea#
+10    #S′S′Sthen     then       thenaelsea#
+11    #S′S′S         a          aelsea#                S→a
+12    #S′S′a         a          aelsea#
+13    #S′S′          else       elsea#                 S′→elseS
+14    #S′Selse       else       elsea#
+15    #S′S           a          a#                     S→a
+16    #S′a           a          a#
+17    #S′            #          #                      S′→ε
+18    #              #          #                      分析成功
+
+-------------------- 2. SLR(1) 分析过程表 --------------------
+步骤  状态栈               符号栈                 当前输入  剩余输入串             动作
+--------------------------------------------------------------------------------------------------------
+1     0                    #                      if        ifbthenifbthenaelsea#  移进 if，转到状态 2
+2     0 2                  #if                    b         bthenifbthenaelsea#    移进 b，转到状态 4
+3     0 2 4                #ifb                   then      thenifbthenaelsea#     归约 E→b
+4     0 2 5                #ifE                   then      thenifbthenaelsea#     移进 then，转到状态 6
+5     0 2 5 6              #ifEthen               if        ifbthenaelsea#         移进 if，转到状态 2
+6     0 2 5 6 2            #ifEthenif             b         bthenaelsea#           移进 b，转到状态 4
+7     0 2 5 6 2 4          #ifEthenifb            then      thenaelsea#            归约 E→b
+8     0 2 5 6 2 5          #ifEthenifE            then      thenaelsea#            移进 then，转到状态 6
+9     0 2 5 6 2 5 6        #ifEthenifEthen        a         aelsea#                移进 a，转到状态 1
+10    0 2 5 6 2 5 6 1      #ifEthenifEthena       else      elsea#                 归约 S→a
+11    0 2 5 6 2 5 6 7      #ifEthenifEthenS       else      elsea#                 移进 else，转到状态 8
+12    0 2 5 6 2 5 6 7 8    #ifEthenifEthenSelse   a         a#                     移进 a，转到状态 1
+13    0 2 5 6 2 5 6 7 8 1  #ifEthenifEthenSelsea  #         #                      归约 S→a
+14    0 2 5 6 2 5 6 7 8 9  #ifEthenifEthenSelseS  #         #                      归约 S→ifEthenSelseS
+15    0 2 5 6 7            #ifEthenS              #         #                      归约 S→ifEthenS
+16    0 3                  #S                     #         #                      接受（acc）
+
+################ 三、分析结果 ################
+
+-------------------- 1. LL(1) 分析结果 --------------------
+改造后的文法：
+Vn = { S, S′, E }
+Vt = { a, b, else, if, then }
+S  = S
+P  = { S→a ； S→ifEthenSS′ ； S′→elseS ； S′→ε ； E→b }
+
+  · S 的候选式有公共前缀 ifEthenS：提取为 S→ifEthenSS′
+
+判定：存在 1 处冲突。
+  · M[S′, else] 冲突：“S′→elseS” 与 “S′→ε” 都要求填入，该文法是 LL(1) 文法吗？
+分析步数：18 步
+结论：分析成功：输入串 if b then if b then a else a 是文法 S 的句子。
+
+-------------------- 2. LR(0) / SLR(1) 分析结果 --------------------
+项目集个数：10
+LR(0) 分析表：存在 1 处冲突。
+  · 状态 7，输入 else：移进-归约冲突（s8 与 r2）
+SLR(1) 分析表：存在 1 处冲突。
+  · 状态 7，输入 else：移进-归约冲突（s8 与 r2）
+分析步数：16 步
+结论：分析成功：输入串 if b then if b then a else a 是文法的句子。
+
+################ 附：FIRST / FOLLOW 集 ################
+Vn = { S, S′, E }
+Vt = { a, b, else, if, then }
+S  = S
+
+FIRST(S) = { a, if }
+FIRST(S′) = { else, ε }
+FIRST(E) = { b }
+
+FOLLOW(S) = { #, else }
+FOLLOW(S′) = { #, else }
+FOLLOW(E) = { then }

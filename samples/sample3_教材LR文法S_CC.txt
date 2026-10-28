@@ -1,0 +1,6 @@
+// 示例 3  教材 LR 文法 S→CC，C→cC|d
+// 待识别字符串：ccdd
+// 说明：该文法是 LR(0) 文法，LR(0) 分析表与 SLR(1) 分析表均无冲突。
+//       可再试 cdd、cdcd、dcd（应被接受）与 d、ccd、cd（应被拒绝）。
+S→CC
+C→cC|d

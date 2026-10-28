@@ -1,0 +1,6 @@
+// 示例 5  悬空 else 文法（展示移进-归约冲突）
+// 待识别字符串：if b then if b then a else a
+// 说明：该文法二义，LL(1) 与 LR(0)/SLR(1) 分析表都会出现冲突。
+//       多字符终结符（if、then、else）在产生式与输入串中都要用空格分隔。
+S→if E then S else S|if E then S|a
+E→b
