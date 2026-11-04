@@ -1273,11 +1273,22 @@ public sealed class MainForm : Form
         sb.AppendLine();
         sb.AppendLine("################ 二、分析过程表 ################");
         sb.AppendLine();
-        sb.AppendLine("-------------------- 1. LL(1) 分析过程 --------------------");
+        sb.AppendLine("-------------------- 1. LL(1) 分析过程表 --------------------");
         foreach (string line in _llProcess.ToTextLines()) sb.AppendLine(line);
+
+        // 指导书探索（二）要求输出“LR(0) 分析过程表”：LR(0) 分析表无冲突时才可用于分析
+        string input = _inputBox.Text.Trim();
+        bool lr0Usable = _lr.Lr0Conflicts.Count == 0;
+        int keepMode = _lrMode.SelectedIndex;
+        if (lr0Usable)
+        {
+            sb.AppendLine();
+            sb.AppendLine("-------------------- 2. LR(0) 分析过程表 --------------------");
+            foreach (string line in SimulateLr(false, input)) sb.AppendLine(line);
+        }
         sb.AppendLine();
-        sb.AppendLine("-------------------- 2. LR 分析过程 --------------------");
-        foreach (string line in _lrProcess.ToTextLines()) sb.AppendLine(line);
+        sb.AppendLine($"-------------------- {(lr0Usable ? 3 : 2)}. SLR(1) 分析过程表 --------------------");
+        foreach (string line in SimulateLr(true, input)) sb.AppendLine(line);
 
         sb.AppendLine();
         sb.AppendLine("################ 三、分析结果 ################");
@@ -1293,8 +1304,25 @@ public sealed class MainForm : Form
         AppendRaw(sb, "LR(0) 分析表", _lr0Table);
         AppendRaw(sb, "SLR(1) 分析表", _slrTable);
         AppendRaw(sb, "LL(1) 分析过程", _llProcess);
-        AppendRaw(sb, "LR 分析过程", _lrProcess);
+        AppendRaw(sb, (lr0Usable ? "LR(0)" : "SLR(1)") + " 分析过程", _lrProcess);
+
+        // 恢复界面：按当前所选分析表重新模拟一次，使界面状态与导出内容一致
+        LrAnalyzer.Analyze(_lr, keepMode == 0, input);
+        FillLrResultOnly(_lr);
         return sb.ToString();
+    }
+
+    /// <summary>用指定分析表模拟一次分析过程，返回对齐后的表格文本行（不改变界面）。</summary>
+    private List<string> SimulateLr(bool slr, string input)
+    {
+        LrAnalyzer.Analyze(_lr!, slr, input);
+        var cols = new List<string> { "步骤", "状态栈", "符号栈", "当前输入", "剩余输入串", "动作" };
+        var rows = _lr!.Process
+            .Select(s => new[] { s.Index.ToString(), s.StateStack, s.SymbolStack, s.CurrentInput, s.RemainingInput, s.Action })
+            .ToList();
+        var grid = new GridPanel();
+        grid.ShowRows(cols, rows, null);
+        return grid.ToTextLines();
     }
 
     private static void AppendRaw(StringBuilder sb, string title, GridPanel grid)
@@ -1343,8 +1371,16 @@ public sealed class MainForm : Form
             Ui.WriteText(Path.Combine(dir, "LL1_分析结果.txt"), _llResult.Text);
             Ui.WriteText(Path.Combine(dir, "LR0_分析表.txt"), string.Join(Environment.NewLine, _lr0Table.ToTextLines()));
             Ui.WriteText(Path.Combine(dir, "SLR1_分析表.txt"), string.Join(Environment.NewLine, _slrTable.ToTextLines()));
-            Ui.WriteText(Path.Combine(dir, "LR_分析过程表.txt"), string.Join(Environment.NewLine, _lrProcess.ToTextLines()));
             Ui.WriteText(Path.Combine(dir, "LR_分析结果.txt"), _lrResult.Text);
+
+            // 两张分析表各自的分析过程（指导书探索（二）要求输出 LR(0) 分析过程表）
+            string input = _inputBox.Text.Trim();
+            if (_lr!.Lr0Conflicts.Count == 0)
+                Ui.WriteText(Path.Combine(dir, "LR0_分析过程表.txt"), string.Join(Environment.NewLine, SimulateLr(false, input)));
+            Ui.WriteText(Path.Combine(dir, "SLR1_分析过程表.txt"), string.Join(Environment.NewLine, SimulateLr(true, input)));
+            LrAnalyzer.Analyze(_lr, _lrMode.SelectedIndex == 0, input);
+            FillLrResultOnly(_lr);
+
             Ui.WriteText(Path.Combine(dir, "LR0_项目集规范族.txt"), string.Join(Environment.NewLine, _lrStates.ToTextLines()));
 
             // 状态转换图（与界面上看到的一致）
